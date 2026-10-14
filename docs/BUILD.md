@@ -33,3 +33,14 @@ MINGW64 dentro del proceso bash de construcción.
 copy_dlls identifica las bibliotecas necesarias con ntldd y las copia a bin/;
 no copia las DLL del sistema operativo. Conservar las licencias de las
 dependencias al distribuir una futura versión portable.
+
+Salidas: Spout2 master, SHA256 de spout.zip
+0CD717C8D14DBF21A8DF5C16C0C64317DBFB2F9EE256138D7FBEB8F7EBFC53F7.
+Se compila SpoutLibrary con scripts/build-spout.ps1, CMake 4.3.3 y Ninja 1.13.2.
+Usar ese DLL y el header fuente correspondiente; la DLL precompilada incluida
+en el archivo descargado produjo un fallo nativo durante el envío.
+
+ofxNDI master, SHA256 de ndi.zip
+24BBCAEA3926232C2BD12E7FCA14CA3E416D6E8F04C36B720AD557471CDA362C.
+Se usan sus headers NDI y el runtime x64 incluido, mediante carga dinámica.
+Ver OUTPUT.md para plataforma y formato de alfa de cada backend.

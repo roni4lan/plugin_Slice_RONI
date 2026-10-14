@@ -9,6 +9,8 @@
 #include "geometry/Polyline.h"
 #include "styles/StyleRegistry.h"
 #include <set>
+#include "output/SpoutOutput.h"
+#include "output/NdiOutput.h"
 
 void ofApp::setup() {
     ofSetFrameRate(60); ofSetEscapeQuitsApp(false); gui.setup();
@@ -30,6 +32,7 @@ void ofApp::open(const std::string& path) {
         projectPath=json ? std::filesystem::absolute(path).string() : "";
         selected.clear(); loaded=true; fitPending=true;
         renderer.clearCache();
+        output.close();
         status="Mapping cargado: Arena " + composition.arenaVersion;
     } catch (const std::exception& e) { status=e.what(); ofLogError("open") << status; }
 }
@@ -53,7 +56,7 @@ void ofApp::keyPressed(int key) {
 }
 void ofApp::draw() {
     ofBackground(18,21,28);
-    if(loaded){renderer.render(composition,project,ofGetElapsedTimef());if(!renderer.error.empty())status=renderer.error;}
+    if(loaded){try{ofSetFrameRate(std::max(60,project.output.value("fps",60)));renderer.render(composition,project,ofGetElapsedTimef());if(!renderer.error.empty())status=renderer.error;else if(!lastRenderError.empty())status="Mapping cargado: Arena "+composition.arenaVersion;lastRenderError=renderer.error;output.update(project.output,renderer.frame(),renderer.preview());}catch(const std::exception& e){status=e.what();output.close();}}
     gui.begin();
     ImGui::SetNextWindowPos(ImVec2(0,0)); ImGui::SetNextWindowSize(ImVec2(ofGetWidth(),ofGetHeight()));
     ImGui::Begin("RONI RESO",nullptr,ImGuiWindowFlags_NoDecoration|ImGuiWindowFlags_NoMove|ImGuiWindowFlags_MenuBar);
@@ -75,6 +78,23 @@ void ofApp::sidebar() {
     if (ImGui::Button("Abrir XML / proyecto")) dialogOpen();
     if (!loaded) { ImGui::TextWrapped("Arrastra un XML de Advanced Output a esta ventana."); return; }
     ImGui::Text("Composicion: %d x %d",composition.width,composition.height);
+    if(ImGui::CollapsingHeader("Salida a Resolume",ImGuiTreeNodeFlags_DefaultOpen)){
+        bool enabled=project.output.value("enabled",false);if(ImGui::Checkbox("Enviar textura",&enabled))project.output["enabled"]=enabled;
+        auto type=project.output.value("type",std::string("Spout"));
+        if(ImGui::BeginCombo("Salida",type.c_str())){for(auto candidate:{"Spout","NDI","Syphon"})if(ImGui::Selectable(candidate,type==candidate))project.output["type"]=candidate;ImGui::EndCombo();}
+        char name[201];auto current=project.output.value("name",std::string("RONI RESO"));std::snprintf(name,sizeof(name),"%s",current.c_str());
+        if(ImGui::InputText("Emisor",name,sizeof(name)))project.output["name"]=std::string(name);
+        int fps=project.output.value("fps",60);if(ImGui::SliderInt("FPS salida",&fps,1,120))project.output["fps"]=fps;
+        bool custom=project.output.value("resolutionMode",std::string("composition"))=="custom";
+        if(ImGui::Checkbox("Resolucion personalizada",&custom))project.output["resolutionMode"]=custom?"custom":"composition";
+        if(custom){int w=project.output.value("width",composition.width),h=project.output.value("height",composition.height);if(ImGui::InputInt("Ancho",&w))project.output["width"]=ofClamp(w,1,16384);if(ImGui::InputInt("Alto",&h))project.output["height"]=ofClamp(h,1,16384);}
+        else ImGui::Text("Salida: %d x %d",composition.width,composition.height);
+        auto alpha=project.output.value("alphaMode",std::string("premultiplied"));
+        if(type=="NDI")ImGui::Text("Alfa NDI: directo (RGBA)");
+        else if(ImGui::BeginCombo("Alfa",alpha.c_str())){for(auto option:{"premultiplied","straight"})if(ImGui::Selectable(option,alpha==option))project.output["alphaMode"]=option;ImGui::EndCombo();}
+        ImGui::TextWrapped("%s",output.status.c_str());ImGui::Text("Enviados: %llu | %.1f FPS",static_cast<unsigned long long>(output.sentFrames),output.measuredFps);
+        if(ImGui::Button("Reintentar salida"))output.close();
+    }
     if(ImGui::Checkbox("Ver espacio de salida",&outputSpace))fitPending=true;
     ImGui::Checkbox("Ver bordes renderizados",&showBorders);
     if (ImGui::Button("Ajustar vista (F)")) fitPending=true;
@@ -262,6 +282,16 @@ void ofApp::selfTest() {
         double glowFps=120/(ofGetElapsedTimef()-start);
         if(glowFps<60 || before!=renderer.regenerations)throw std::runtime_error("Rendimiento/cache con halo no cumple");
         report["distinctStyles"]=signatures.size();report["animatedStyles"]=animatedStyles;report["bloomHalo"]=true;report["benchmark50SlicesFalloffFps"]=glowFps;
+        ofLogNotice("self-test") << "Spout y NDI: round-trip de textura y alfa";
+        sample.screens[0].slices[0].inputPoints={{60,30},{500,30},{500,160},{60,160}};
+        renderProject.defaultStyle=sb::styleDefaults();renderProject.defaultStyle["opacity"]=0.5;renderProject.defaultStyle["thickness"]=14.0;
+        renderer.render(sample,renderProject,0);glFinish();
+        sb::SpoutOutput spout;spout.setup("SliceBorders-SelfTest-Spout",60);
+        if(!spout.verifyLoopback(renderer.frame().getTexture()))throw std::runtime_error("Spout no conserva textura/alfa/orientacion");spout.close();
+        ofLogNotice("self-test") << "Spout completado; inicializando NDI";
+        sb::NdiOutput ndi;ndi.setup("SliceBorders-SelfTest-NDI",60);
+        if(!ndi.verifyLoopback(renderer.preview().getTexture()))throw std::runtime_error("NDI no conserva resolucion/alfa/orientacion");ndi.close();
+        report["spoutTextureRoundTrip"]=true;report["ndiAlphaRoundTrip"]=true;
     } catch(const std::exception& e) { report={{"passed",false},{"error",e.what()}}; }
     ofSavePrettyJson(ofToDataPath("self-test-report.json"),report);
     ofLogNotice("self-test") << report.dump();

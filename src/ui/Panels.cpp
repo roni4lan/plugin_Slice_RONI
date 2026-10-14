@@ -54,7 +54,7 @@ void drawStylePanel(Project& project,const std::string& selected){
         if(scope!=2){if(ImGui::Checkbox("Propio",&own)){if(own)(*target)[p.name]=effective[p.name];else target->erase(p.name);}ImGui::SameLine();}
         ImGui::TextUnformatted(p.label.c_str());
         auto v=effective[p.name];bool changed=false;ImGui::BeginDisabled(!own);
-        if(p.type=="float"){float f=v;changed=ImGui::SliderFloat("##value",&f,p.min,p.max,"%.3f");v=f;}
+        if(p.type=="float"){float f=v;changed=ImGui::SliderFloat("##value",&f,p.min,p.max,p.min>0 && p.min<0.001f?"%.5f":"%.3f",ImGuiSliderFlags_NoRoundToFormat|ImGuiSliderFlags_AlwaysClamp);v=ofClamp(f,p.min,p.max);}
         else if(p.type=="int"){int i=v;changed=ImGui::SliderInt("##value",&i,p.min,p.max);v=i;}
         else if(p.type=="bool"){bool b=v;changed=ImGui::Checkbox("##value",&b);v=b;}
         else if(p.type=="color"){float c[4]={v[0],v[1],v[2],v[3]};changed=ImGui::ColorEdit4("##value",c);v={c[0],c[1],c[2],c[3]};}

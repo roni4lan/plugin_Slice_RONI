@@ -51,3 +51,29 @@ Benchmark de 120 frames con GL finish, 50 slices, Neon con falloff y FBO
 1920×1080: 236.29 FPS del renderer; las meshes no se regeneraron durante
 la animación. La interfaz presenta a 60 FPS. No se ha medido aún la salida
 con Resolume ni el benchmark de 50 slices con bloom.
+
+## Fase 4 — Windows
+
+Spout: ida y vuelta de una textura RGBA semitransparente y asimétrica mediante
+un segundo receptor Spout. Todos los canales coinciden dentro de 2/255,
+incluyendo orientación y dimensiones. Se compiló SpoutLibrary desde el mismo
+árbol de fuentes y headers con GCC: la DLL precompilada descargada fallaba
+en la llamada nativa. El wrapper usa únicamente la interfaz compatible de
+SpoutLibrary, sin transmitir objetos std::string/vector entre compiladores.
+
+NDI: receptor local RGBA con resolución 640×360. Orientación y alfa verificados;
+máxima variación de alfa observada 5/255, con tolerancia de 8/255 por compresión.
+El receptor se libera después de la prueba y el emisor deja de anunciarse.
+
+Arena 7.19.1 detectó RONI_RESO_TEST. Se observó en su Advanced Output el mapping
+ejemplo_advanced con Virtual Output 1920×1080 y los bordes cian sobre una
+capa Solid Color roja: el fondo y los interiores se conservan transparentes,
+y los bordes coinciden con los límites de los slices. El usuario participó
+directamente en esta comprobación usando los controles de la app y Arena.
+
+Syphon permanece condicionado a macOS y ofxSyphon; no se ha compilado ni
+ejecutado en macOS. La aceptación y el empaquetado actuales corresponden a Windows.
+
+La prueba manual detectó un límite inferior que el formato de un slider
+redondeaba a cero (noiseScale). Se desactivó el redondeo del control y se
+conservó mayor precisión; los mensajes de render se limpian al corregir el valor.

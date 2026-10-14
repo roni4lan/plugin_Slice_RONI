@@ -493,7 +493,7 @@ Los estilos se registran en `StyleRegistry`. Un estilo nuevo debe poder añadirs
 | 1. Base y cargador | ☑ completada | Compilacion Release y ejecucion verificadas; XML real con 3 slices en posiciones/nombres correctos, seleccion y zoom comprobados visualmente, guardado/reapertura JSON y resolucion variable comprobados en self-test. |
 | 2. Geometría y renderer | ☑ completada | Release ejecutada; grosor/esquinas probados en vivo. Tests de geometria, transparencia, alfa premultiplicado, mezclas e herencia correctos. Benchmark final: 489 FPS del renderer con 50 slices a 1920x1080 (sin limite de FPS; UI separada a 60). |
 | 3. Patrones, animaciones y glow | ☑ completada | 8 presets visualmente distintos, 7 animados por defecto; patrones/ruido y perfiles multiples implementados. Bloom y falloff verificados; 236 FPS del renderer con 50 slices y falloff a 1920x1080. |
-| 4. Salida a Resolume | ☐ pendiente | |
+| 4. Salida a Resolume | ☑ completada en Windows | Spout y NDI verifican ida/vuelta, dimensiones, orientacion y alfa; fuente RONI_RESO_TEST comprobada en Arena 7.19.1 sobre fondo rojo y mapping real. Syphon condicionado a macOS/ofxSyphon, pendiente de validar en Mac. |
 | 5. Modulación y OSC | ☐ pendiente | |
 | 6. Pulido | ☐ pendiente | |
 
