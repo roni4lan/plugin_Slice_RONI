@@ -7,9 +7,12 @@
 #include "ui/Panels.h"
 #include "model/StyleParams.h"
 #include "geometry/Polyline.h"
+#include "styles/StyleRegistry.h"
+#include <set>
 
 void ofApp::setup() {
     ofSetFrameRate(60); ofSetEscapeQuitsApp(false); gui.setup();
+    sb::StyleRegistry::instance().writeInitialPresets();
     ofLogNotice("setup") << "Inicializando shaders";
     try { renderer.setup(); } catch(const std::exception& e){status=e.what();}
     if (!initialPath.empty()) open(initialPath);
@@ -235,6 +238,30 @@ void ofApp::selfTest() {
         report["geometryAndJoins"]=true;report["transparentBackground"]=true;report["premultipliedAlpha"]=true;
         report["meshCache"]=true;report["benchmark50SlicesFps"]=fps;report["inheritance"]=true;report["alphaAwareBlendModes"]=true;
         renderer.frame().readToPixels(pixels);ofSaveImage(pixels,ofToDataPath("phase2-check.png"));
+        ofLogNotice("self-test") << "Ocho estilos y animacion";
+        auto imageHash=[](const ofPixels& p){uint64_t hash=1469598103934665603ull;for(size_t i=0;i<p.size();++i){hash^=p.getData()[i];hash*=1099511628211ull;}return hash;};
+        sb::Composition sample=visual;sample.width=640;sample.height=360;sample.screens[0].slices={slice};
+        sample.screens[0].slices[0].inputPoints={{100,100},{540,100},{540,260},{100,260}};
+        std::set<uint64_t> signatures;int animatedStyles=0;
+        for(const auto& preset:sb::StyleRegistry::instance().styles()){
+            renderProject.defaultStyle=sb::styleDefaults();renderProject.defaultStyle.update(preset.second->defaults());renderProject.defaultStyle["thickness"]=12.0;
+            renderer.render(sample,renderProject,0.123f);renderer.frame().readToPixels(pixels);
+            if(!renderer.error.empty())throw std::runtime_error(renderer.error);
+            auto firstHash=imageHash(pixels);signatures.insert(firstHash);
+            ofSaveImage(pixels,ofToDataPath("check-"+preset.first+".png"));
+            renderer.render(sample,renderProject,0.487f);renderer.frame().readToPixels(pixels);
+            if(imageHash(pixels)!=firstHash)++animatedStyles;
+        }
+        if(signatures.size()<8 || animatedStyles<6)throw std::runtime_error("Los estilos no son distintos/animados");
+        renderProject.defaultStyle=sb::styleDefaults();renderProject.defaultStyle.update(sb::StyleRegistry::instance().get("Neon").defaults());renderProject.defaultStyle["thickness"]=12.0;
+        renderProject.defaultStyle["glowMode"]="bloom";renderer.render(sample,renderProject,0);renderer.frame().readToPixels(pixels);
+        if(pixels.getColor(100,80).a==0 || pixels.getColor(20,20).a!=0)throw std::runtime_error("Blur bloom no produce halo transparente correcto");
+        ofSaveImage(pixels,ofToDataPath("check-Bloom.png"));
+        renderProject.defaultStyle["glowMode"]="falloff";renderer.render(visual,renderProject,0);glFinish();before=renderer.regenerations;start=ofGetElapsedTimef();
+        for(int frame=0;frame<120;++frame){renderer.render(visual,renderProject,frame/60.f);glFinish();}
+        double glowFps=120/(ofGetElapsedTimef()-start);
+        if(glowFps<60 || before!=renderer.regenerations)throw std::runtime_error("Rendimiento/cache con halo no cumple");
+        report["distinctStyles"]=signatures.size();report["animatedStyles"]=animatedStyles;report["bloomHalo"]=true;report["benchmark50SlicesFalloffFps"]=glowFps;
     } catch(const std::exception& e) { report={{"passed",false},{"error",e.what()}}; }
     ofSavePrettyJson(ofToDataPath("self-test-report.json"),report);
     ofLogNotice("self-test") << report.dump();

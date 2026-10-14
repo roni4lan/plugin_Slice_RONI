@@ -1,0 +1,9 @@
+{
+    "name": "Gradient",
+    "params": {
+        "colorMode": "gradientPerimeter",
+        "gradientRotation": 70.0,
+        "hueShiftSpeed": 0.05,
+        "presetName": "Gradient"
+    }
+}

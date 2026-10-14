@@ -1,0 +1,9 @@
+{
+    "name": "Solid",
+    "params": {
+        "animation": "none",
+        "pattern": "solid",
+        "presetName": "Solid",
+        "profile": "hard"
+    }
+}

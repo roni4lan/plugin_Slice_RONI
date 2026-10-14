@@ -4,11 +4,21 @@
 namespace sb {
 BorderMesh BorderMesh::build(const std::vector<glm::vec2>& source,const ofJson& p) {
     BorderMesh out; bool closed=p.at("closePath").get<bool>();
-    float thickness=p.at("thickness"),half=thickness/2;
+    float thickness=p.at("thickness"),coreHalf=thickness/2,half=coreHalf;
+    auto profile=p.at("profile").get<std::string>();
+    if(profile=="doubleLine" || profile=="tripleLine"){int count=std::max(p.at("lineCount").get<int>(),profile=="doubleLine"?2:3);half=std::max(half,(count-1)*p.at("lineGap").get<float>()/2+coreHalf/count);}
+    if(p.at("pattern")=="ticks")half=std::max(half,p.at("tickLength").get<float>()/2);
+    if(p.at("glowEnabled")==true && p.at("glowMode")=="falloff")half+=p.at("glowRadius").get<float>();
     std::string alignment=p.at("alignment"),join=p.at("joinStyle"),cap=p.at("capStyle"),mode=p.at("segmentsMode");
-    float center=p.at("offset").get<float>()+(alignment=="inside"?half:alignment=="outside"?-half:0);
+    float center=p.at("offset").get<float>()+(alignment=="inside"?coreHalf:alignment=="outside"?-coreHalf:0);
     float limit=p.at("miterLimit"); int subdivisions=p.at("subdivision"),mask=p.at("edgeMask");
     out.contour=Polyline::offset(Polyline::rounded(source,p.at("cornerRadius"),subdivisions,closed),center,limit,closed);
+    bool distorted=p.at("noiseEnabled").get<bool>() || p.at("jitter").get<float>()>0 || p.at("glitchAmount").get<float>()>0 || p.at("pattern")=="wave" || p.at("pattern")=="zigzag";
+    if(distorted){
+        std::vector<glm::vec2> sampled;
+        for(size_t i=0;i<(closed?out.contour.size():out.contour.size()-1);++i){auto a=out.contour[i],b=out.contour[(i+1)%out.contour.size()];int count=std::max(1,int(std::ceil(glm::distance(a,b)/8.f)));for(int k=0;k<count;++k)sampled.push_back(glm::mix(a,b,float(k)/count));}
+        if(!closed)sampled.push_back(out.contour.back());out.contour=std::move(sampled);
+    }
     auto& pts=out.contour; size_t n=pts.size(); if(n<2) throw std::runtime_error("Slice sin contorno");
     out.perimeter=Polyline::length(pts,closed); out.mesh.setMode(OF_PRIMITIVE_TRIANGLES);
     float winding=Polyline::area(pts)>=0?1.f:-1.f;
@@ -26,7 +36,12 @@ BorderMesh BorderMesh::build(const std::vector<glm::vec2>& source,const ofJson& 
         if(glm::length(n1+n2)<0.001f) throw std::runtime_error("Giro de 180 grados no soportado");
         miters[i]=glm::normalize(n1+n2); ratios[i]=1/std::max(0.001f,glm::dot(miters[i],n2));
     }
-    auto emit=[&](glm::vec2 pt,float distance,float v){out.mesh.addVertex({pt.x,pt.y,0});out.mesh.addTexCoord({distance,v});};
+    auto emit=[&](glm::vec2 pt,float distance,float v){
+        size_t index=std::min(n-1,size_t(std::max(0,int(std::upper_bound(u.begin(),u.end(),distance)-u.begin())-1)));
+        if(closed && distance>=out.perimeter-0.001f)index=0;
+        auto normal=glm::normalize(miters[index]);out.mesh.addNormal({normal.x,normal.y,0});
+        out.mesh.addVertex({pt.x,pt.y,0});out.mesh.addTexCoord({distance,v*half/coreHalf});
+    };
     auto triangle=[&](glm::vec2 a,glm::vec2 b,glm::vec2 c,float distance,float av,float bv,float cv){emit(a,distance,av);emit(b,distance,bv);emit(c,distance,cv);};
     auto active=[&](size_t edge){
         if(mode!="selectedEdges") return true;

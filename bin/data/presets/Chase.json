@@ -1,0 +1,11 @@
+{
+    "name": "Chase",
+    "params": {
+        "animation": "chase",
+        "chaseLength": 0.08,
+        "chaseTail": 0.28,
+        "glowEnabled": true,
+        "glowRadius": 18.0,
+        "presetName": "Chase"
+    }
+}

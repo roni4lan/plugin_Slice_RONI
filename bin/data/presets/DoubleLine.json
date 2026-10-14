@@ -1,0 +1,11 @@
+{
+  "name": "DoubleLine",
+  "params": {
+    "colorMode": "gradientPerimeter",
+    "lineCount": 2,
+    "lineGap": 10.0,
+    "presetName": "DoubleLine",
+    "profile": "doubleLine",
+    "gradientRotation": 28.0
+  }
+}

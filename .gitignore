@@ -9,4 +9,6 @@ build/
 build-*.log
 bin/data/self-test-report.json
 bin/data/imgui.ini
+bin/data/phase2-check.png
+bin/data/check-*.png
 *.user

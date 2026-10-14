@@ -1,0 +1,11 @@
+{
+    "name": "Pulse",
+    "params": {
+        "animation": "pulse",
+        "glowEnabled": true,
+        "glowRadius": 20.0,
+        "presetName": "Pulse",
+        "pulseDepth": 0.85,
+        "pulseRate": 1.5
+    }
+}

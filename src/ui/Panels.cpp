@@ -1,6 +1,7 @@
 #include "Panels.h"
 #include "../model/StyleParams.h"
 #include "imgui.h"
+#include "../styles/StyleRegistry.h"
 namespace sb {
 void drawStylePanel(Project& project,const std::string& selected){
     static int scope=0;static char newGroup[128]={};
@@ -25,6 +26,26 @@ void drawStylePanel(Project& project,const std::string& selected){
     auto effective=styleDefaults();effective.update(project.defaultStyle);
     if(scope!=2 && !group.empty())effective.update(project.groups[group]);
     if(scope==0)effective.update(*target);
+    if(ImGui::BeginCombo("Estilo",effective.value("presetName",std::string("Solid")).c_str())){
+        for(const auto& entry:StyleRegistry::instance().styles())if(ImGui::Selectable(entry.first.c_str(),effective.value("presetName",std::string("Solid"))==entry.first)){
+            auto defaults=styleDefaults();size_t index=0;
+            for(const auto& parameter:parameterRegistry()){if(index++<12)continue;(*target)[parameter.name]=defaults[parameter.name];}
+            (*target)["gradientStops"]=ofJson::array();target->update(entry.second->defaults());
+            if(scope==0)binding["styleName"]=entry.first;
+            effective.update(*target);
+        }
+        ImGui::EndCombo();
+    }
+    static std::string presetStatus;
+    if(ImGui::Button("Guardar preset")){
+        auto dialog=ofSystemSaveDialog(ofToDataPath("presets/Custom.json",true),"Guardar preset");
+        if(dialog.bSuccess){auto values=effective;try{validateStyle(values);if(!ofSavePrettyJson(dialog.getPath(),{{"name",ofFilePath::getBaseName(dialog.getPath())},{"params",values}}))throw std::runtime_error("No se pudo guardar");presetStatus="Preset guardado";}catch(const std::exception& e){presetStatus=e.what();}}
+    }
+    ImGui::SameLine();if(ImGui::Button("Cargar preset")){
+        auto dialog=ofSystemLoadDialog("Cargar preset JSON");
+        if(dialog.bSuccess)try{auto values=ofLoadJson(dialog.getPath()).at("params");validateStyle(values);StyleRegistry::instance().get(values.value("presetName",std::string("Solid")));auto defaults=styleDefaults();size_t index=0;for(const auto& parameter:parameterRegistry()){if(index++<12)continue;(*target)[parameter.name]=defaults[parameter.name];}(*target)["gradientStops"]=ofJson::array();target->update(values);effective.update(*target);presetStatus="Preset cargado";}catch(const std::exception& e){presetStatus=e.what();}
+    }
+    if(!presetStatus.empty())ImGui::TextWrapped("%s",presetStatus.c_str());
     ImGui::TextWrapped(scope==2?"Valores globales":"Desmarca Propio para heredar el valor.");
     ImGui::PushItemWidth(-1);
     for(const auto& p:parameterRegistry()){

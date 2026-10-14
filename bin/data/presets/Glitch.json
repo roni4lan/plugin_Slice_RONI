@@ -1,0 +1,17 @@
+{
+    "name": "Glitch",
+    "params": {
+        "colorA": [
+            1.0,
+            0.1,
+            0.4,
+            1.0
+        ],
+        "glitchAmount": 0.7,
+        "jitter": 2.0,
+        "noiseAffects": 5,
+        "noiseAmount": 12.0,
+        "noiseEnabled": true,
+        "presetName": "Glitch"
+    }
+}

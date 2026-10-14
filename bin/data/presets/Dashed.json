@@ -1,0 +1,9 @@
+{
+    "name": "Dashed",
+    "params": {
+        "dashRoundCaps": true,
+        "dashSpeed": 80.0,
+        "pattern": "dashed",
+        "presetName": "Dashed"
+    }
+}
