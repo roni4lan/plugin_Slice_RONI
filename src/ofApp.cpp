@@ -4,9 +4,14 @@
 #include <filesystem>
 #include <fstream>
 #include "pugixml.hpp"
+#include "ui/Panels.h"
+#include "model/StyleParams.h"
+#include "geometry/Polyline.h"
 
 void ofApp::setup() {
     ofSetFrameRate(60); ofSetEscapeQuitsApp(false); gui.setup();
+    ofLogNotice("setup") << "Inicializando shaders";
+    try { renderer.setup(); } catch(const std::exception& e){status=e.what();}
     if (!initialPath.empty()) open(initialPath);
     if (testMode) selfTest();
 }
@@ -21,6 +26,7 @@ void ofApp::open(const std::string& path) {
         project=std::move(next); composition=std::move(mapping);
         projectPath=json ? std::filesystem::absolute(path).string() : "";
         selected.clear(); loaded=true; fitPending=true;
+        renderer.clearCache();
         status="Mapping cargado: Arena " + composition.arenaVersion;
     } catch (const std::exception& e) { status=e.what(); ofLogError("open") << status; }
 }
@@ -44,6 +50,7 @@ void ofApp::keyPressed(int key) {
 }
 void ofApp::draw() {
     ofBackground(18,21,28);
+    if(loaded){renderer.render(composition,project,ofGetElapsedTimef());if(!renderer.error.empty())status=renderer.error;}
     gui.begin();
     ImGui::SetNextWindowPos(ImVec2(0,0)); ImGui::SetNextWindowSize(ImVec2(ofGetWidth(),ofGetHeight()));
     ImGui::Begin("RONI RESO",nullptr,ImGuiWindowFlags_NoDecoration|ImGuiWindowFlags_NoMove|ImGuiWindowFlags_MenuBar);
@@ -65,7 +72,8 @@ void ofApp::sidebar() {
     if (ImGui::Button("Abrir XML / proyecto")) dialogOpen();
     if (!loaded) { ImGui::TextWrapped("Arrastra un XML de Advanced Output a esta ventana."); return; }
     ImGui::Text("Composicion: %d x %d",composition.width,composition.height);
-    ImGui::Checkbox("Ver espacio de salida",&outputSpace);
+    if(ImGui::Checkbox("Ver espacio de salida",&outputSpace))fitPending=true;
+    ImGui::Checkbox("Ver bordes renderizados",&showBorders);
     if (ImGui::Button("Ajustar vista (F)")) fitPending=true;
     ImGui::Separator();
     for (auto& screen : composition.screens) {
@@ -87,6 +95,7 @@ void ofApp::sidebar() {
         ImGui::PopID(); ImGui::Separator();
     }
     ImGui::TextWrapped("Rueda: zoom\nBoton central: desplazar\nClick: seleccionar slice");
+    sb::drawStylePanel(project,selected);
 }
 void ofApp::preview() {
     ImVec2 origin=ImGui::GetCursorScreenPos(), area=ImGui::GetContentRegionAvail();
@@ -109,6 +118,11 @@ void ofApp::preview() {
     if (loaded) {
         draw->AddRectFilled(transform({0,0}),transform({width,height}),IM_COL32(29,34,44,255));
         draw->AddRect(transform({0,0}),transform({width,height}),IM_COL32(110,120,140,255));
+        if(showBorders && renderer.preview().isAllocated()) {
+            // The UI texture uses straight alpha; the output keeps premultiplied alpha.
+            draw->AddImage((ImTextureID)(uintptr_t)renderer.preview().getTexture().getTextureData().textureID,
+                transform({0,0}),transform({composition.width,composition.height}),ImVec2(0,0),ImVec2(1,1));
+        }
         std::string picked;
         for (const auto& screen:composition.screens) {
             if (!project.screenEnabled.value(screen.id,screen.enabled)) continue;
@@ -118,7 +132,7 @@ void ofApp::preview() {
                 std::vector<ImVec2> vertices; ofPolyline hit;
                 for (auto p:contour) { vertices.push_back(transform(p)); hit.addVertex(p.x,p.y); }
                 hit.close();
-                draw->AddPolyline(vertices.data(),vertices.size(),selected==slice.id?IM_COL32(255,200,60,255):IM_COL32(40,220,245,255),ImDrawFlags_Closed,selected==slice.id?3:1.5f);
+                if(!showBorders || selected==slice.id)draw->AddPolyline(vertices.data(),vertices.size(),selected==slice.id?IM_COL32(255,200,60,255):IM_COL32(40,220,245,255),ImDrawFlags_Closed,selected==slice.id?1:1.5f);
                 draw->AddText(vertices[0],IM_COL32(240,240,245,255),slice.name.c_str());
                 auto local=(mouse-pan)/zoom;
                 if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && hit.inside(local.x,local.y)) picked=slice.id;
@@ -130,6 +144,8 @@ void ofApp::preview() {
 }
 void ofApp::selfTest() {
     ofJson report;
+    ofSavePrettyJson(ofToDataPath("self-test-report.json"),{{"passed",false},{"state","running"}});
+    ofLogNotice("self-test") << "Carga y persistencia";
     try {
         if (!loaded) throw std::runtime_error("El XML inicial no cargo");
         if (composition.width!=1920 || composition.height!=1080 || composition.screens.size()!=1 || composition.screens[0].slices.size()!=3)
@@ -161,6 +177,64 @@ void ofApp::selfTest() {
         if (!rejected) throw std::runtime_error("Coordenada invalida no rechazada");
         report={{"passed",true},{"screens",1},{"slices",3},{"projectRoundTrip",true},
                 {"variableResolution",true},{"invalidCoordinateRejected",true}};
+        ofLogNotice("self-test") << "Geometria";
+        auto style=sb::styleDefaults();style["thickness"]=16.0;
+        auto rectangle=std::vector<glm::vec2>{{100,100},{500,100},{500,400},{100,400}};
+        if(std::abs(sb::Polyline::length(rectangle)-1400)>0.01f || sb::Polyline::resample(rectangle,10).size()!=140)
+            throw std::runtime_error("Longitud/remuestreo incorrectos");
+        for(auto join:{"miter","round","bevel"}) {
+            style["joinStyle"]=join;auto mesh=sb::BorderMesh::build(rectangle,style);
+            if(mesh.mesh.getNumVertices()==0)throw std::runtime_error("Mesh vacia");
+            for(auto v:mesh.mesh.getVertices())if(!std::isfinite(v.x)||!std::isfinite(v.y))throw std::runtime_error("Vertice invalido");
+        }
+        sb::Composition visual;visual.width=1920;visual.height=1080;
+        sb::Screen screen;screen.id="test-screen";screen.name="Test";screen.width=visual.width;screen.height=visual.height;
+        sb::Slice slice;slice.id="test-slice";slice.name="Test";slice.inputPoints=rectangle;slice.outputPoints=rectangle;screen.slices.push_back(slice);visual.screens.push_back(screen);
+        sb::Project renderProject;renderProject.defaultStyle=sb::styleDefaults();renderProject.defaultStyle["thickness"]=16.0;
+        ofLogNotice("self-test") << "Render y transparencia";
+        renderer.render(visual,renderProject,0);ofPixels pixels;renderer.frame().readToPixels(pixels);
+        if(!renderer.error.empty())throw std::runtime_error(renderer.error);
+        if(!pixels.isAllocated() || pixels.getNumChannels()!=4)throw std::runtime_error("Readback RGBA invalido");
+        if(pixels.getColor(300,250).a!=0 || pixels.getColor(700,100).a!=0)
+            throw std::runtime_error("El fondo/relleno no es transparente");
+        // oF's FBO projection makes texture row zero correspond to input y=0.
+        if(pixels.getColor(100,250).a<240 || pixels.getColor(100,1080-1-250).a!=0)
+            throw std::runtime_error("Borde no renderizado en posicion esperada");
+        renderProject.defaultStyle["opacity"]=0.5;
+        renderer.render(visual,renderProject,0);renderer.frame().readToPixels(pixels);
+        auto pixel=pixels.getColor(100,250);
+        if(pixel.a<120 || pixel.a>135 || pixel.b>pixel.a+1)throw std::runtime_error("Alpha no premultiplicado correctamente");
+        renderProject.defaultStyle["colorA"]={1.0,0.0,0.0,1.0};
+        auto overlay=slice;overlay.id="overlay";visual.screens[0].slices.push_back(overlay);
+        renderProject.bindings[overlay.id]={{"enabled",true},{"params",{{"colorA",{0.0,0.0,1.0,1.0}}}}};
+        for(auto blend:{"alpha","screen","multiply"}) {
+            renderProject.defaultStyle["blendMode"]=blend;renderer.render(visual,renderProject,0);renderer.frame().readToPixels(pixels);
+            auto p=pixels.getColor(100,250);int expectedRed=std::string(blend)=="screen"?128:64;
+            int expectedBlue=std::string(blend)=="multiply"?64:128;
+            if(std::abs(int(p.r)-expectedRed)>3 || std::abs(int(p.b)-expectedBlue)>3 || std::abs(int(p.a)-191)>3)
+                throw std::runtime_error(std::string("Mezcla/alfa incorrectos: ")+blend+" RGB="+ofToString(p.r)+","+ofToString(p.b)+" A="+ofToString(p.a));
+        }
+        renderProject.defaultStyle=sb::styleDefaults();renderProject.defaultStyle["thickness"]=16.0;renderProject.bindings.clear();
+        visual.screens[0].slices.clear();
+        for(int i=0;i<50;++i){auto clone=slice;clone.id="perf-"+ofToString(i);float x=(i%10)*190+20,y=(i/10)*210+20;clone.inputPoints={{x,y},{x+150,y},{x+150,y+170},{x,y+170}};visual.screens[0].slices.push_back(clone);}
+        ofLogNotice("self-test") << "Rendimiento con 50 slices";
+        renderer.clearCache();renderer.render(visual,renderProject,0);glFinish();auto before=renderer.regenerations;
+        double start=ofGetElapsedTimef();
+        for(int frame=0;frame<120;++frame){renderer.render(visual,renderProject,frame/60.f);glFinish();}
+        double fps=120/(ofGetElapsedTimef()-start);
+        if(renderer.regenerations!=before)throw std::runtime_error("La mesh se regenera sin cambios geometricos");
+        if(fps<60)throw std::runtime_error("Rendimiento inferior a 60 FPS con 50 slices: "+ofToString(fps));
+        sb::Project inheritance;inheritance.defaultStyle["thickness"]=8.0;
+        inheritance.groups["grupo"]={{"thickness",12.0}};
+        auto bound=ofJson{{"group","grupo"},{"params",{{"thickness",17.0}}}};
+        if(sb::resolveStyle(inheritance.defaultStyle,inheritance.groups,bound)["thickness"]!=17.0)throw std::runtime_error("Herencia de slice incorrecta");
+        bound["params"].erase("thickness");
+        if(sb::resolveStyle(inheritance.defaultStyle,inheritance.groups,bound)["thickness"]!=12.0)throw std::runtime_error("Herencia de grupo incorrecta");
+        bound.erase("group");
+        if(sb::resolveStyle(inheritance.defaultStyle,inheritance.groups,bound)["thickness"]!=8.0)throw std::runtime_error("Herencia global incorrecta");
+        report["geometryAndJoins"]=true;report["transparentBackground"]=true;report["premultipliedAlpha"]=true;
+        report["meshCache"]=true;report["benchmark50SlicesFps"]=fps;report["inheritance"]=true;report["alphaAwareBlendModes"]=true;
+        renderer.frame().readToPixels(pixels);ofSaveImage(pixels,ofToDataPath("phase2-check.png"));
     } catch(const std::exception& e) { report={{"passed",false},{"error",e.what()}}; }
     ofSavePrettyJson(ofToDataPath("self-test-report.json"),report);
     ofLogNotice("self-test") << report.dump();

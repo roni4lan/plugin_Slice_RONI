@@ -26,6 +26,7 @@ struct Project {
     std::string xmlPath;
     ofJson bindings = ofJson::object();
     ofJson screenEnabled = ofJson::object();
+    ofJson groups = ofJson::object();
     ofJson defaultStyle = {{"thickness", 6.0}, {"colorA", {0.0, 0.9, 1.0, 1.0}}};
     ofJson output = {{"type", "Spout"}, {"name", "RONI RESO"}, {"enabled", false},
                      {"resolutionMode", "composition"}, {"fps", 60}};

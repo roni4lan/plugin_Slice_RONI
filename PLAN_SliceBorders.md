@@ -491,7 +491,7 @@ Los estilos se registran en `StyleRegistry`. Un estilo nuevo debe poder añadirs
 |---|---|---|
 | 0. Análisis del formato | ☑ completada para el ejemplo disponible | XML de Arena 7.19.1 analizado: 1 screen, 3 slices; extracción de contornos input/output documentada y verificada en `docs/FORMAT.md`. Variantes sin evidencia y ejemplos adicionales listados. Sin código de render; Fase 1 no iniciada. |
 | 1. Base y cargador | ☑ completada | Compilacion Release y ejecucion verificadas; XML real con 3 slices en posiciones/nombres correctos, seleccion y zoom comprobados visualmente, guardado/reapertura JSON y resolucion variable comprobados en self-test. |
-| 2. Geometría y renderer | ☐ pendiente | |
+| 2. Geometría y renderer | ☑ completada | Release ejecutada; grosor/esquinas probados en vivo. Tests de geometria, transparencia, alfa premultiplicado, mezclas e herencia correctos. Benchmark final: 489 FPS del renderer con 50 slices a 1920x1080 (sin limite de FPS; UI separada a 60). |
 | 3. Patrones, animaciones y glow | ☐ pendiente | |
 | 4. Salida a Resolume | ☐ pendiente | |
 | 5. Modulación y OSC | ☐ pendiente | |

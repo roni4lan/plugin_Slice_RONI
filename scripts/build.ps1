@@ -1,4 +1,4 @@
-param([int]$Jobs = 4, [string]$MsysRoot = 'C:\msys64', [string]$Drive = 'R:')
+param([int]$Jobs = 4, [string]$MsysRoot = 'C:\msys64', [string]$Drive = 'R:', [ValidatePattern('^[A-Za-z0-9_-]+$')][string]$AppName = 'SliceBorders')
 $ErrorActionPreference = 'Stop'
 $taskRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 if (-not (Test-Path (Join-Path $taskRoot 'vendor/of/libs/openFrameworks/ofMain.h'))) {
@@ -10,6 +10,6 @@ if (Test-Path ($Drive + '\')) { throw "La unidad $Drive ya existe. Elegi otra co
 if ($LASTEXITCODE -ne 0) { throw 'No se pudo crear el alias de compilacion' }
 try {
     $taskDrivePath = '/' + $Drive.Substring(0,1).ToLowerInvariant()
-    & (Join-Path $MsysRoot 'usr/bin/bash.exe') '--noprofile' '--norc' "$taskDrivePath/scripts/build.sh" $taskDrivePath $Jobs
+    & (Join-Path $MsysRoot 'usr/bin/bash.exe') '--noprofile' '--norc' "$taskDrivePath/scripts/build.sh" $taskDrivePath $Jobs $AppName
     if ($LASTEXITCODE -ne 0) { throw 'La compilacion fallo' }
 } finally { & subst.exe $Drive /D }

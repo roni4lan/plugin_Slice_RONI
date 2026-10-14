@@ -2,6 +2,7 @@
 #include "ofMain.h"
 #include "ofxImGui.h"
 #include "model/Composition.h"
+#include "render/BorderRenderer.h"
 class ofApp : public ofBaseApp {
 public:
     explicit ofApp(std::string initial = {}, bool selfTest = false): initialPath(std::move(initial)), testMode(selfTest) {}
@@ -13,6 +14,8 @@ private:
     ofxImGui::Gui gui;
     sb::Composition composition;
     sb::Project project;
+    sb::BorderRenderer renderer;
+    bool showBorders=true;
     std::string initialPath, projectPath, selected, status = "Abrir un XML de Advanced Output";
     bool testMode = false, loaded = false;
     bool fitPending = true, outputSpace = false;
