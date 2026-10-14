@@ -1,7 +1,8 @@
 #include "GlowPass.h"
+#include "ShaderManager.h"
 namespace sb {
 void GlowPass::setup(){
-    if(!blur.load(ofToDataPath("shaders/border.vert"),ofToDataPath("shaders/blur.frag")) || !mix.load(ofToDataPath("shaders/border.vert"),ofToDataPath("shaders/glow_mix.frag")))throw std::runtime_error("Shader de halo invalido");
+    if(!blur.load(ofToDataPath("shaders/border.vert"),ofToDataPath("shaders/blur.frag")) || !mix.load(ofToDataPath("shaders/border.vert"),ofToDataPath("shaders/glow_mix.frag")) || !linkedShader(blur) || !linkedShader(mix))throw std::runtime_error("Shader de halo invalido");
 }
 void GlowPass::apply(ofFbo& source,ofFbo& borders,ofFbo& destination,float radius,int passes){
     int w=std::max(1,int(source.getWidth())/2),h=std::max(1,int(source.getHeight())/2);

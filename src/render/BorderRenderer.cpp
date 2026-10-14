@@ -9,11 +9,22 @@ void BorderRenderer::setup(){
     glow.setup();
     shaders.get("shaders/border_solid.frag");
     if(!composite.load(ofToDataPath("shaders/border.vert"),ofToDataPath("shaders/composite.frag")) ||
-       !previewShader.load(ofToDataPath("shaders/border.vert"),ofToDataPath("shaders/preview.frag")))
+       !previewShader.load(ofToDataPath("shaders/border.vert"),ofToDataPath("shaders/preview.frag")) || !linkedShader(composite) || !linkedShader(previewShader))
         throw std::runtime_error("No se pudieron cargar los shaders");
+}
+bool BorderRenderer::reloadShaders(){
+    try{
+        // Compile every stage into temporary programs; keep the complete old set on failure.
+        ShaderManager next;GlowPass nextGlow;ofShader nextComposite,nextPreview;
+        for(const auto& entry:StyleRegistry::instance().styles())next.get(entry.second->fragmentShader());
+        nextGlow.setup();
+        if(!nextComposite.load(ofToDataPath("shaders/border.vert"),ofToDataPath("shaders/composite.frag")) || !nextPreview.load(ofToDataPath("shaders/border.vert"),ofToDataPath("shaders/preview.frag")) || !linkedShader(nextComposite) || !linkedShader(nextPreview))throw std::runtime_error("Shader compuesto invalido");
+        shaders=std::move(next);glow=std::move(nextGlow);composite=std::move(nextComposite);previewShader=std::move(nextPreview);error.clear();return true;
+    }catch(const std::exception& e){error=std::string("Recarga rechazada; shaders anteriores activos: ")+e.what();return false;}
 }
 void BorderRenderer::allocate(int w,int h){
     if(target.isAllocated() && target.getWidth()==w && target.getHeight()==h)return;
+    GLint maxSize=0;glGetIntegerv(GL_MAX_TEXTURE_SIZE,&maxSize);if(w<1 || h<1 || w>maxSize || h>maxSize)throw std::runtime_error("Resolucion supera el limite de textura de la GPU");
     ofFbo::Settings settings;settings.width=w;settings.height=h;settings.internalformat=GL_RGBA8;settings.textureTarget=GL_TEXTURE_2D;
     settings.useDepth=false;settings.useStencil=false;settings.numSamples=0;
     for(auto* f:{&target,&layer,&backup,&display})f->allocate(settings);

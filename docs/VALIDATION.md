@@ -88,3 +88,30 @@ seno grave de 93.75 Hz; un parámetro reacciona a su nivel. Entrada real:
 un dispositivo disponible, 1024 muestras recibidas por callback.
 LFO, AD/ADSR, tap tempo, suma antes del clamp y persistencia comprobados.
 Benchmark con otros programas abiertos: 206.85 FPS con 50 slices y falloff.
+
+## Fase 6
+
+Release compilada y suite completa aprobada. Exportación XML simulada sobre
+una copia del fixture: cambio 1920×1080 a 2560×1440 y desplazamiento de un
+contorno 100 px. El nuevo borde se verificó leyendo el FBO; Neon y grosor 23
+se conservaron. ID reemplazado: recuperación por nombre único aprobada.
+Exportación incompleta: se conservó el último mapping. Debounce 350 ms probado.
+Undo/redo agrupa un gesto de edición. Shader deliberadamente inválido rechazado
+mediante GL_LINK_STATUS; la imagen anterior permaneció idéntica byte por byte;
+restaurar el shader permitió recargar. El mensaje de compilación inválida en
+el log forma parte de esta prueba negativa. Falloff: 197.66 FPS con 50 slices.
+
+Selección múltiple, grupos, atajos y modo performance implementados. La
+carpeta portable incluye ejecutable, DLL, shaders, presets, fixture, documentos
+y avisos de licencias. La aceptación actual cubre Windows; Mac permanece pendiente.
+
+Portable verificada desde dist/Pluguin Slice RONI RESO, con código de salida 0
+y passed=true. Benchmark portable: 192.52 FPS con 50 slices y falloff. Interfaz
+observada a 60 FPS mediante la skill computer-use; F12 oculta/restaura controles
+y el contador de Spout continúa aumentando en performance. Se dejó la versión
+portable abierta con el fixture y Spout RONI RESO activo.
+
+Temporización Spout corregida: el envío avanza por fecha programada, evitando
+acumular el jitter de la interfaz. La última compilación portable volvió a
+pasar la suite completa. Prueba manual de envío: interfaz 60 FPS y emisor
+aproximadamente 58–60 FPS, frente a 43–49 con el temporizador anterior.

@@ -33,10 +33,16 @@ void OutputManager::update(const ofJson& settings,ofFbo& premultiplied,ofFbo& st
         ofTexture* texture=&source.getTexture();
         if(settings.value("resolutionMode",std::string("composition"))=="custom"){
             int w=settings.value("width",int(source.getWidth())),h=settings.value("height",int(source.getHeight()));
+            GLint limit=0;glGetIntegerv(GL_MAX_TEXTURE_SIZE,&limit);if(w<1 || h<1 || w>limit || h>limit)throw std::runtime_error("Resolucion de salida supera el limite de la GPU");
             if(!scaled.isAllocated() || scaled.getWidth()!=w || scaled.getHeight()!=h){ofFbo::Settings s;s.width=w;s.height=h;s.internalformat=GL_RGBA8;s.textureTarget=GL_TEXTURE_2D;s.useDepth=false;s.useStencil=false;scaled.allocate(s);}
             ofPushStyle();scaled.begin();ofClear(0,0,0,0);ofDisableAlphaBlending();ofSetColor(255);source.draw(0,0,w,h);scaled.end();ofPopStyle();texture=&scaled.getTexture();
         }
-        if(backend->send(*texture)){++sentFrames;++windowFrames;lastSent=now;}status=backend->status;
+        if(backend->send(*texture)){
+            ++sentFrames;++windowFrames;
+            // Advance the scheduled timestamp instead of accumulating frame jitter.
+            // After a long stall restart at now, avoiding a burst of catch-up frames.
+            lastSent=lastSent<0 || now-lastSent>2.0/fps?now:lastSent+1.0/fps;
+        }status=backend->status;
         if(now-windowStart>=1){measuredFps=windowFrames/(now-windowStart);windowFrames=0;windowStart=now;}
     }catch(const std::exception& e){status=e.what();if(backend){backend->close();backend.reset();}}
 }

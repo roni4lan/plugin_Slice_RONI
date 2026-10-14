@@ -1,4 +1,5 @@
 vendor/
+dist/
 obj/
 bin/*.exe
 bin/*.dll
@@ -7,6 +8,7 @@ bin/data/projects/
 build/
 .build/
 build-*.log
+portable-*.log
 bin/data/self-test-report.json
 bin/data/imgui.ini
 bin/data/phase2-check.png

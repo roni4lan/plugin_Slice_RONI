@@ -12,6 +12,7 @@ public:
     ofFbo& frame(){return target;}
     ofFbo& preview(){return display;}
     void clearCache(){cache.clear();}
+    bool reloadShaders();
     std::string error;
     size_t vertices=0, regenerations=0;
 private:

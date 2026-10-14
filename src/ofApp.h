@@ -8,6 +8,9 @@
 #include "modulation/BeatClock.h"
 #include "modulation/ModulationMatrix.h"
 #include "control/OscServer.h"
+#include "io/FileWatcher.h"
+#include "model/ProjectHistory.h"
+#include <set>
 class ofApp : public ofBaseApp {
 public:
     explicit ofApp(std::string initial = {}, bool selfTest = false): initialPath(std::move(initial)), testMode(selfTest) {}
@@ -27,6 +30,11 @@ private:
     sb::BeatClock beatClock;
     sb::ModulationMatrix modulation;
     sb::OscServer osc;
+    sb::FileWatcher mappingWatcher,shaderWatcher;
+    sb::ProjectHistory history;
+    std::set<std::string> selection;
+    bool performance=false;
+    double nextWatch=0;
     std::string audioSignature;
     bool showBorders=true;
     std::string initialPath, projectPath, selected, status = "Abrir un XML de Advanced Output";
@@ -41,4 +49,6 @@ private:
     void sidebar();
     void preview();
     void selfTest();
+    void reloadMapping();
+    void select(const std::string& id,bool multiple);
 };

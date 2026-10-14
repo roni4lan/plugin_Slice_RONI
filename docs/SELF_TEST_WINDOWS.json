@@ -1,0 +1,43 @@
+{
+    "alphaAwareBlendModes": true,
+    "animatedStyles": 7,
+    "benchmark50SlicesFalloffFps": 209.51441535195437,
+    "benchmark50SlicesFps": 198.13484764601276,
+    "bloomHalo": true,
+    "distinctStyles": 8,
+    "geometryAndJoins": true,
+    "inheritance": true,
+    "invalidCoordinateRejected": true,
+    "meshCache": true,
+    "ndiAlphaRoundTrip": true,
+    "passed": true,
+    "phase5": {
+        "adAdsr": true,
+        "audioFftTone": true,
+        "audioInputDevices": 1,
+        "audioParameterReaction": true,
+        "bpmRenderedPulse": true,
+        "controlProjectRoundTrip": true,
+        "lfo": true,
+        "liveAudioCapturedFrames": 1024,
+        "modulationSumBeforeClamp": true,
+        "oscUdpEightMessages": true,
+        "tapTempo": true
+    },
+    "phase6": {
+        "debouncedWatcher": true,
+        "invalidExportKeepsLastMapping": true,
+        "reexportMovesRenderedBorder": true,
+        "shaderReloadAtomic": true,
+        "undoRedoGesture": true,
+        "uniqueNameFallback": true,
+        "xmlReloadPreservesStyleAndResolution": true
+    },
+    "premultipliedAlpha": true,
+    "projectRoundTrip": true,
+    "screens": 1,
+    "slices": 3,
+    "spoutTextureRoundTrip": true,
+    "transparentBackground": true,
+    "variableResolution": true
+}

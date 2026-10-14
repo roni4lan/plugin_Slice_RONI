@@ -14,12 +14,15 @@
 #include "ui/ControlPanels.h"
 #include "modulation/LFO.h"
 #include "tests/Phase5Checks.h"
+#include "io/MappingReload.h"
+#include "tests/Phase6Checks.h"
 
 void ofApp::setup() {
     ofSetFrameRate(60); ofSetEscapeQuitsApp(false); gui.setup();
     sb::StyleRegistry::instance().writeInitialPresets();
     ofLogNotice("setup") << "Inicializando shaders";
     try { renderer.setup(); } catch(const std::exception& e){status=e.what();}
+    shaderWatcher.reset(ofToDataPath("shaders",true));
     if (!initialPath.empty()) open(initialPath);
     if (testMode) selfTest();
 }
@@ -33,7 +36,8 @@ void ofApp::open(const std::string& path) {
         // Commit only after the entire file validates, preserving the current project on error.
         project=std::move(next); composition=std::move(mapping);
         projectPath=json ? std::filesystem::absolute(path).string() : "";
-        selected.clear(); loaded=true; fitPending=true;
+        selected.clear();selection.clear(); loaded=true; fitPending=true;
+        mappingWatcher.reset(project.xmlPath);history.reset(project);modulation=sb::ModulationMatrix{};
         renderer.clearCache();
         output.close();
         audio.stop();osc.stop();audioSignature.clear();beatClock=sb::BeatClock{};beatClock.setBeats(0,ofGetElapsedTimef());
@@ -46,9 +50,19 @@ void ofApp::dialogOpen() {
 }
 void ofApp::update(){
     if(!loaded)return;double time=ofGetElapsedTimef();
+    if(!testMode && time>=nextWatch){nextWatch=time+0.15;if(mappingWatcher.poll(time))reloadMapping();if(shaderWatcher.poll(time)){status=renderer.reloadShaders()?"Shaders recargados":renderer.error;}}
     beatClock.setBpm(project.clock.value("bpm",128.0),time);beatClock.setPlaying(project.clock.value("playing",true),time);
     osc.update(project,composition,beatClock,modulation,time);
     auto key=project.audio.dump();if(key!=audioSignature){audioSignature=key;if(project.audio.value("enabled",false))audio.start(project.audio.value("deviceIndex",0));else audio.stop();}
+}
+void ofApp::reloadMapping(){
+    try{sb::reloadMapping(composition,project);renderer.clearCache();fitPending=true;status="Mapping actualizado; estilos conservados";history.observe(project);}
+    catch(const std::exception& e){status=std::string("Recarga rechazada; mapping anterior activo: ")+e.what();}
+}
+void ofApp::select(const std::string& id,bool multiple){
+    if(!multiple)selection.clear();
+    if(multiple && selection.count(id))selection.erase(id);else selection.insert(id);
+    selected=selection.count(id)?id:selection.empty()?"":*selection.begin();
 }
 void ofApp::saveProject() {
     if (!loaded) return;
@@ -63,11 +77,16 @@ void ofApp::keyPressed(int key) {
     if (key=='o' && ofGetKeyPressed(OF_KEY_CONTROL)) dialogOpen();
     if (key=='s' && ofGetKeyPressed(OF_KEY_CONTROL)) saveProject();
     if (key=='f') fitPending=true;
+    if(key==OF_KEY_F12)performance=!performance;
+    if(key=='r' && loaded)reloadMapping();
+    if(key=='z' && ofGetKeyPressed(OF_KEY_CONTROL)){bool ok=ofGetKeyPressed(OF_KEY_SHIFT)?history.redo(project):history.undo(project);if(ok){renderer.clearCache();status="Proyecto restaurado";}}
+    if(key=='y' && ofGetKeyPressed(OF_KEY_CONTROL) && history.redo(project)){renderer.clearCache();status="Proyecto restaurado";}
     if(key=='t'){auto bpm=beatClock.tap(ofGetElapsedTimef());project.clock["bpm"]=bpm;project.defaultStyle["bpm"]=bpm;}
 }
 void ofApp::draw() {
     ofBackground(18,21,28);
     if(loaded){try{ofSetFrameRate(std::max(60,project.output.value("fps",60)));auto animated=modulation.apply(project,composition,ofGetElapsedTimef(),audio.bands(),beatClock,osc.values);renderer.render(composition,animated,ofGetElapsedTimef());if(!renderer.error.empty())status=renderer.error;else if(!lastRenderError.empty())status="Mapping cargado: Arena "+composition.arenaVersion;lastRenderError=renderer.error;output.update(project.output,renderer.frame(),renderer.preview());}catch(const std::exception& e){status=e.what();output.close();}}
+    if(performance){ofSetColor(255);if(loaded && renderer.preview().isAllocated()){float scale=std::min(float(ofGetWidth())/composition.width,float(ofGetHeight())/composition.height);renderer.preview().draw((ofGetWidth()-composition.width*scale)/2,(ofGetHeight()-composition.height*scale)/2,composition.width*scale,composition.height*scale);}ofDrawBitmapStringHighlight("Performance | F12: controles | "+output.status,12,20);history.observe(project);return;}
     gui.begin();
     ImGui::SetNextWindowPos(ImVec2(0,0)); ImGui::SetNextWindowSize(ImVec2(ofGetWidth(),ofGetHeight()));
     ImGui::Begin("RONI RESO",nullptr,ImGuiWindowFlags_NoDecoration|ImGuiWindowFlags_NoMove|ImGuiWindowFlags_MenuBar);
@@ -75,6 +94,10 @@ void ofApp::draw() {
         if (ImGui::BeginMenu("Archivo")) {
             if (ImGui::MenuItem("Abrir XML / proyecto","Ctrl+O")) dialogOpen();
             if (ImGui::MenuItem("Guardar proyecto","Ctrl+S",false,loaded)) saveProject();
+            if(ImGui::MenuItem("Recargar mapping","R",false,loaded))reloadMapping();
+            if(ImGui::MenuItem("Deshacer","Ctrl+Z",false,loaded))history.undo(project);
+            if(ImGui::MenuItem("Rehacer","Ctrl+Y",false,loaded))history.redo(project);
+            if(ImGui::MenuItem("Performance","F12"))performance=true;
             ImGui::EndMenu();
         }
         ImGui::Text("Pluguin Slice RONI RESO | %.1f FPS",ofGetFrameRate());
@@ -84,6 +107,7 @@ void ofApp::draw() {
     ImGui::SameLine(); ImGui::BeginChild("Vista",ImVec2(0,-35),true); preview(); ImGui::EndChild();
     ImGui::TextWrapped("%s",status.c_str());
     ImGui::End(); gui.end();
+    if(loaded)history.observe(project,ImGui::IsMouseDown(0) || ImGui::IsAnyItemActive());
 }
 void ofApp::sidebar() {
     if (ImGui::Button("Abrir XML / proyecto")) dialogOpen();
@@ -123,13 +147,20 @@ void ofApp::sidebar() {
             bool visible=binding.value("enabled",slice.enabled);
             if (ImGui::Checkbox("##enabled",&visible)) binding["enabled"]=visible;
             ImGui::SameLine();
-            if (ImGui::Selectable(slice.name.c_str(),selected==slice.id)) selected=slice.id;
+            if (ImGui::Selectable(slice.name.c_str(),selection.count(slice.id)>0)) select(slice.id,ImGui::GetIO().KeyCtrl);
             if (selected==slice.id) ImGui::TextWrapped("ID: %s",slice.id.c_str());
             ImGui::PopID();
         }
         ImGui::PopID(); ImGui::Separator();
     }
     ImGui::TextWrapped("Rueda: zoom\nBoton central: desplazar\nClick: seleccionar slice");
+    if(selection.size()>1){
+        ImGui::Text("%d slices seleccionados",int(selection.size()));
+        if(ImGui::Button("Habilitar todos"))for(const auto& id:selection)project.bindings[id]["enabled"]=true;
+        ImGui::SameLine();if(ImGui::Button("Ocultar todos"))for(const auto& id:selection)project.bindings[id]["enabled"]=false;
+        if(ImGui::BeginCombo("Estilo para seleccion","Elegir")){for(const auto& entry:sb::StyleRegistry::instance().styles())if(ImGui::Selectable(entry.first.c_str()))for(const auto& id:selection){project.bindings[id]["params"]=entry.second->defaults();project.bindings[id]["styleName"]=entry.first;}ImGui::EndCombo();}
+        if(ImGui::BeginCombo("Grupo para seleccion","Elegir")){if(ImGui::Selectable("Sin grupo"))for(const auto& id:selection)project.bindings[id]["group"]="";for(const auto& item:project.groups.items())if(ImGui::Selectable(item.key().c_str()))for(const auto& id:selection)project.bindings[id]["group"]=item.key();ImGui::EndCombo();}
+    }
     sb::drawStylePanel(project,selected);
 }
 void ofApp::preview() {
@@ -167,13 +198,13 @@ void ofApp::preview() {
                 std::vector<ImVec2> vertices; ofPolyline hit;
                 for (auto p:contour) { vertices.push_back(transform(p)); hit.addVertex(p.x,p.y); }
                 hit.close();
-                if(!showBorders || selected==slice.id)draw->AddPolyline(vertices.data(),vertices.size(),selected==slice.id?IM_COL32(255,200,60,255):IM_COL32(40,220,245,255),ImDrawFlags_Closed,selected==slice.id?1:1.5f);
+                if(!showBorders || selection.count(slice.id))draw->AddPolyline(vertices.data(),vertices.size(),selection.count(slice.id)?IM_COL32(255,200,60,255):IM_COL32(40,220,245,255),ImDrawFlags_Closed,1.5f);
                 draw->AddText(vertices[0],IM_COL32(240,240,245,255),slice.name.c_str());
                 auto local=(mouse-pan)/zoom;
                 if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left) && hit.inside(local.x,local.y)) picked=slice.id;
             }
         }
-        if (!picked.empty()) selected=picked;
+        if (!picked.empty()) select(picked,io.KeyCtrl);
     } else draw->AddText(ImVec2(origin.x+30,origin.y+30),IM_COL32(170,180,195,255),"Carga tu mapping para ver los slices");
     draw->PopClipRect();
 }
@@ -306,6 +337,8 @@ void ofApp::selfTest() {
         report["spoutTextureRoundTrip"]=true;report["ndiAlphaRoundTrip"]=true;
         ofLogNotice("self-test") << "Modulacion, audio, BPM y OSC UDP";
         report["phase5"]=sb::phase5Checks(composition,project.xmlPath,renderer);
+        ofLogNotice("self-test") << "Recarga XML/shaders y deshacer/rehacer";
+        report["phase6"]=sb::phase6Checks(composition,project.xmlPath,renderer);
     } catch(const std::exception& e) { report={{"passed",false},{"error",e.what()}}; }
     ofSavePrettyJson(ofToDataPath("self-test-report.json"),report);
     ofLogNotice("self-test") << report.dump();

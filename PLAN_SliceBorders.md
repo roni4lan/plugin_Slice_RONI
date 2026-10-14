@@ -489,13 +489,13 @@ Los estilos se registran en `StyleRegistry`. Un estilo nuevo debe poder añadirs
 
 | Fase | Estado | Notas |
 |---|---|---|
-| 0. Análisis del formato | ☑ completada para el ejemplo disponible | XML de Arena 7.19.1 analizado: 1 screen, 3 slices; extracción de contornos input/output documentada y verificada en `docs/FORMAT.md`. Variantes sin evidencia y ejemplos adicionales listados. Sin código de render; Fase 1 no iniciada. |
+| 0. Análisis del formato | ☑ completada para el ejemplo disponible | XML de Arena 7.19.1 analizado: 1 screen, 3 slices; extracción de contornos input/output documentada y verificada en `docs/FORMAT.md`. Variantes sin evidencia y ejemplos adicionales listados.  |
 | 1. Base y cargador | ☑ completada | Compilacion Release y ejecucion verificadas; XML real con 3 slices en posiciones/nombres correctos, seleccion y zoom comprobados visualmente, guardado/reapertura JSON y resolucion variable comprobados en self-test. |
 | 2. Geometría y renderer | ☑ completada | Release ejecutada; grosor/esquinas probados en vivo. Tests de geometria, transparencia, alfa premultiplicado, mezclas e herencia correctos. Benchmark final: 489 FPS del renderer con 50 slices a 1920x1080 (sin limite de FPS; UI separada a 60). |
 | 3. Patrones, animaciones y glow | ☑ completada | 8 presets visualmente distintos, 7 animados por defecto; patrones/ruido y perfiles multiples implementados. Bloom y falloff verificados; 236 FPS del renderer con 50 slices y falloff a 1920x1080. |
 | 4. Salida a Resolume | ☑ completada en Windows | Spout y NDI verifican ida/vuelta, dimensiones, orientacion y alfa; fuente RONI_RESO_TEST comprobada en Arena 7.19.1 sobre fondo rojo y mapping real. Syphon condicionado a macOS/ofxSyphon, pendiente de validar en Mac. |
 | 5. Modulación y OSC | ☑ completada | Release ejecutada: OSC UDP modifica ocho controles, pulso BPM verificado en FBO, FFT y reaccion de parametros comprobadas; entrada real recibio 1024 muestras. LFO, AD/ADSR y persistencia correctos. |
-| 6. Pulido | ☐ pendiente | |
+| 6. Pulido | ☑ completada en Windows | Recarga XML con nueva geometria/resolucion mantiene estilos por ID/nombre unico; XML y shaders invalidos mantienen la ultima version. Undo/redo, grupos, seleccion multiple y performance incluidos. Portable ejecutada y suite completa aprobada desde dist. |
 
 ---
 
@@ -507,4 +507,3 @@ Los estilos se registran en `StyleRegistry`. Un estilo nuevo debe poder añadirs
 - Resolución de la composición: `1920 x 1080 en el ejemplo actual; variable, leer CurrentCompositionTextureSize en cada XML`
 - Cantidad aproximada de slices: `3 en el ejemplo actual, dentro de 1 screen`
 - Archivos XML de ejemplo: `ejemplo_advanced.xml en la raíz; samples/ aún no presente`
-
