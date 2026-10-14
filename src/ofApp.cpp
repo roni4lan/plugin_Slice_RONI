@@ -11,6 +11,9 @@
 #include <set>
 #include "output/SpoutOutput.h"
 #include "output/NdiOutput.h"
+#include "ui/ControlPanels.h"
+#include "modulation/LFO.h"
+#include "tests/Phase5Checks.h"
 
 void ofApp::setup() {
     ofSetFrameRate(60); ofSetEscapeQuitsApp(false); gui.setup();
@@ -33,12 +36,19 @@ void ofApp::open(const std::string& path) {
         selected.clear(); loaded=true; fitPending=true;
         renderer.clearCache();
         output.close();
+        audio.stop();osc.stop();audioSignature.clear();beatClock=sb::BeatClock{};beatClock.setBeats(0,ofGetElapsedTimef());
         status="Mapping cargado: Arena " + composition.arenaVersion;
     } catch (const std::exception& e) { status=e.what(); ofLogError("open") << status; }
 }
 void ofApp::dialogOpen() {
     auto result=ofSystemLoadDialog("Abrir XML de Arena o proyecto JSON");
     if (result.bSuccess) open(result.getPath());
+}
+void ofApp::update(){
+    if(!loaded)return;double time=ofGetElapsedTimef();
+    beatClock.setBpm(project.clock.value("bpm",128.0),time);beatClock.setPlaying(project.clock.value("playing",true),time);
+    osc.update(project,composition,beatClock,modulation,time);
+    auto key=project.audio.dump();if(key!=audioSignature){audioSignature=key;if(project.audio.value("enabled",false))audio.start(project.audio.value("deviceIndex",0));else audio.stop();}
 }
 void ofApp::saveProject() {
     if (!loaded) return;
@@ -53,10 +63,11 @@ void ofApp::keyPressed(int key) {
     if (key=='o' && ofGetKeyPressed(OF_KEY_CONTROL)) dialogOpen();
     if (key=='s' && ofGetKeyPressed(OF_KEY_CONTROL)) saveProject();
     if (key=='f') fitPending=true;
+    if(key=='t'){auto bpm=beatClock.tap(ofGetElapsedTimef());project.clock["bpm"]=bpm;project.defaultStyle["bpm"]=bpm;}
 }
 void ofApp::draw() {
     ofBackground(18,21,28);
-    if(loaded){try{ofSetFrameRate(std::max(60,project.output.value("fps",60)));renderer.render(composition,project,ofGetElapsedTimef());if(!renderer.error.empty())status=renderer.error;else if(!lastRenderError.empty())status="Mapping cargado: Arena "+composition.arenaVersion;lastRenderError=renderer.error;output.update(project.output,renderer.frame(),renderer.preview());}catch(const std::exception& e){status=e.what();output.close();}}
+    if(loaded){try{ofSetFrameRate(std::max(60,project.output.value("fps",60)));auto animated=modulation.apply(project,composition,ofGetElapsedTimef(),audio.bands(),beatClock,osc.values);renderer.render(composition,animated,ofGetElapsedTimef());if(!renderer.error.empty())status=renderer.error;else if(!lastRenderError.empty())status="Mapping cargado: Arena "+composition.arenaVersion;lastRenderError=renderer.error;output.update(project.output,renderer.frame(),renderer.preview());}catch(const std::exception& e){status=e.what();output.close();}}
     gui.begin();
     ImGui::SetNextWindowPos(ImVec2(0,0)); ImGui::SetNextWindowSize(ImVec2(ofGetWidth(),ofGetHeight()));
     ImGui::Begin("RONI RESO",nullptr,ImGuiWindowFlags_NoDecoration|ImGuiWindowFlags_NoMove|ImGuiWindowFlags_MenuBar);
@@ -97,6 +108,7 @@ void ofApp::sidebar() {
     }
     if(ImGui::Checkbox("Ver espacio de salida",&outputSpace))fitPending=true;
     ImGui::Checkbox("Ver bordes renderizados",&showBorders);
+    sb::drawControlPanels(project,composition,selected,audio,beatClock,modulation,osc);
     if (ImGui::Button("Ajustar vista (F)")) fitPending=true;
     ImGui::Separator();
     for (auto& screen : composition.screens) {
@@ -292,6 +304,8 @@ void ofApp::selfTest() {
         sb::NdiOutput ndi;ndi.setup("SliceBorders-SelfTest-NDI",60);
         if(!ndi.verifyLoopback(renderer.preview().getTexture()))throw std::runtime_error("NDI no conserva resolucion/alfa/orientacion");ndi.close();
         report["spoutTextureRoundTrip"]=true;report["ndiAlphaRoundTrip"]=true;
+        ofLogNotice("self-test") << "Modulacion, audio, BPM y OSC UDP";
+        report["phase5"]=sb::phase5Checks(composition,project.xmlPath,renderer);
     } catch(const std::exception& e) { report={{"passed",false},{"error",e.what()}}; }
     ofSavePrettyJson(ofToDataPath("self-test-report.json"),report);
     ofLogNotice("self-test") << report.dump();

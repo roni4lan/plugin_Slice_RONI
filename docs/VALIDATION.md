@@ -77,3 +77,14 @@ ejecutado en macOS. La aceptación y el empaquetado actuales corresponden a Wind
 La prueba manual detectó un límite inferior que el formato de un slider
 redondeaba a cero (noiseScale). Se desactivó el redondeo del control y se
 conservó mayor precisión; los mensajes de render se limpian al corregir el valor.
+
+## Fase 5
+
+Release compilada y ejecutada. Suite completa aprobada: ocho mensajes OSC
+entregados por UDP local cambian estilo, grosor, velocidad, color, grupo,
+BPM, salida y fuente de modulación. Paquete inválido rechazado. Pulso BPM
+comprobado leyendo píxeles del FBO en dos fases opuestas. FFT detecta un
+seno grave de 93.75 Hz; un parámetro reacciona a su nivel. Entrada real:
+un dispositivo disponible, 1024 muestras recibidas por callback.
+LFO, AD/ADSR, tap tempo, suma antes del clamp y persistencia comprobados.
+Benchmark con otros programas abiertos: 206.85 FPS con 50 slices y falloff.

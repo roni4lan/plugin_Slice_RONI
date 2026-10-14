@@ -83,7 +83,13 @@ inline const std::vector<Parameter>& parameterRegistry() {
         {"glitchAmount","Glitch","float",0.0,0,1},
         {"glitchRate","Glitch (Hz)","float",8.0,0.1,60},
         {"jitter","Temblor (px)","float",0.0,0,100},
-        {"flicker","Parpadeo neon","float",0.0,0,1}
+        {"flicker","Parpadeo neon","float",0.0,0,1},
+        {"syncMode","Sincronizacion","enum","free",0,1,{"free","bpm","audio","osc"}},
+        {"bpm","BPM del estilo","float",128.0,20,300},
+        {"beatDivision","Beats por ciclo","enum","1",0,1,{"1/4","1/2","1","2","4","8"}},
+        {"audioBand","Banda de audio","enum","bass",0,1,{"bass","lowMid","mid","high","all"}},
+        {"audioAmount","Respuesta audio","float",1.0,0,5},
+        {"audioSmoothing","Suavizado audio","float",0.7,0,0.999}
     };
     return p;
 }
@@ -124,5 +130,17 @@ inline void validateStyle(const ofJson& values) {
             validateStyle(ofJson{{"colorA",stop["color"]}}); previous=pos;
         }
     }
+}
+inline const Parameter* findParameter(const std::string& name){for(const auto& p:parameterRegistry())if(p.name==name)return &p;return nullptr;}
+inline int colorComponent(const std::string& name){if(name.size()<3 || name[name.size()-2]!='.')return -1;auto pos=std::string("rgba").find(name.back());return pos==std::string::npos?-1:int(pos);}
+inline std::vector<std::string> numericTargets(){std::vector<std::string> result;for(const auto& p:parameterRegistry()){if(p.type=="float"||p.type=="int")result.push_back(p.name);else if(p.type=="color")for(char c:std::string("rgba"))result.push_back(p.name+"."+c);}return result;}
+inline float numericValue(const ofJson& style,const std::string& name){int c=colorComponent(name);if(c>=0)return style.at(name.substr(0,name.size()-2)).at(c).get<float>();return style.at(name).get<float>();}
+inline void setNumeric(ofJson& target,const ofJson& effective,const std::string& name,float value){
+    if(!std::isfinite(value))throw std::runtime_error("Modulacion no finita");
+    int component=colorComponent(name);auto* meta=findParameter(component>=0?name.substr(0,name.size()-2):name);
+    if(!meta || (component<0 && meta->type!="float" && meta->type!="int") || (component>=0 && meta->type!="color"))throw std::runtime_error("Parametro no numerico: "+name);
+    if(component>=0){auto color=target.value(meta->name,effective.at(meta->name));color[component]=ofClamp(value,0.f,1.f);target[meta->name]=color;}
+    else if(meta->type=="int")target[name]=int(std::round(ofClamp(value,meta->min,meta->max)));
+    else target[name]=ofClamp(value,meta->min,meta->max);
 }
 }

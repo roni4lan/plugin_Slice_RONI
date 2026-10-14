@@ -31,5 +31,8 @@ struct Project {
     ofJson output = {{"type", "Spout"}, {"name", "RONI RESO"}, {"enabled", false},
                      {"resolutionMode", "composition"}, {"fps", 60}};
     ofJson osc = {{"enabled", false}, {"port", 7000}};
+    ofJson clock = {{"bpm",128.0},{"playing",true}};
+    ofJson audio = {{"enabled",false},{"deviceIndex",0}};
+    ofJson modulation = ofJson::array();
 };
 }

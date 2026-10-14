@@ -21,6 +21,11 @@ void BorderRenderer::allocate(int w,int h){
     if(!target.isAllocated() || !layer.isAllocated() || !backup.isAllocated())throw std::runtime_error("No se pudo crear el FBO");
 }
 void BorderRenderer::drawSlice(const BorderMesh& b,const ofJson& p,float time,float phase,float gain){
+    auto sync=p.at("syncMode").get<std::string>();
+    if(sync=="bpm"){
+        auto division=p.at("beatDivision").get<std::string>();float beats=division=="1/4"?0.25f:division=="1/2"?0.5f:std::stof(division);
+        time=p.value("_beatCount",double(time)*p.at("bpm").get<float>()/60)*p.at("bpm").get<float>()/p.value("_clockBpm",double(p.at("bpm").get<float>()))/beats;
+    }else if(sync=="osc")time=p.value("_oscPhase",time);
     auto c=color(p.at("innerFillColor"));float a=c.a*p.at("innerFillOpacity").get<float>()*p.at("opacity").get<float>();
     if(a>0){ofPath path;path.setFilled(true);for(size_t i=0;i<b.contour.size();++i){auto v=b.contour[i];if(i==0)path.moveTo(v.x,v.y);else path.lineTo(v.x,v.y);}path.close();path.setFillColor(ofFloatColor(c.r*a,c.g*a,c.b*a,a));path.draw();}
     const auto& style=StyleRegistry::instance().get(p.value("presetName",std::string("Solid")));
@@ -34,6 +39,7 @@ void BorderRenderer::drawSlice(const BorderMesh& b,const ofJson& p,float time,fl
         else if(meta.type=="enum")shader.setUniform1i(meta.name,std::find(meta.options.begin(),meta.options.end(),v.get<std::string>())-meta.options.begin());
     }
     shader.setUniform1f("time",time);shader.setUniform1f("phaseOffset",phase);shader.setUniform1f("bloomGain",gain);
+    if(sync=="bpm")shader.setUniform1f("pulseRate",1);
     shader.setUniform1f("perimeter",b.perimeter);
     for(auto name:{"softness","opacity","coreWidth","gradientRepeat","saturation","brightness"})shader.setUniform1f(name,p.at(name).get<float>());
     shader.setUniform1f("gradientOffset",p.at("gradientOffset").get<float>()+time*p.at("gradientRotation").get<float>()/360);
