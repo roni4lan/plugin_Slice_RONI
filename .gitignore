@@ -1,0 +1,12 @@
+vendor/
+obj/
+bin/*.exe
+bin/*.dll
+bin/*.log
+bin/data/projects/
+build/
+.build/
+build-*.log
+bin/data/self-test-report.json
+bin/data/imgui.ini
+*.user
